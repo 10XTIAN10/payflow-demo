@@ -5,29 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PayFlow — Tu billetera digital</title>
 
-  <!-- ✅ Web Experiment: anti-flicker + carga async del SDK (incluye Analytics + Session Replay) -->
-  <!-- DEBE ser el primer script del <head> -->
-  <script>
-    (function(d, h){
-      var apiKey = "049f6232a504b04710662bc7dea55650";
-      var timeout = 1000;
-      var id = "amp-exp-css";
-      try {
-        if (!d.getElementById(id)) {
-          var st = d.createElement("style");
-          st.id = id;
-          st.innerText = "* { visibility: hidden !important; background-image: none !important; }";
-          h.appendChild(st);
-          window.setTimeout(function () { st.remove(); }, timeout);
-          var sc = d.createElement("script");
-          sc.src = "https://cdn.amplitude.com/script/" + apiKey + ".experiment.js";
-          sc.async = true;
-          sc.onerror = function () { st.remove(); };
-          h.insertBefore(sc, d.currentScript || h.lastChild);
-        }
-      } catch(e) { console.error(e); }
-    })(document, document.head);
-  </script>
+  <!-- Amplitude: carga síncrona — garantiza window.amplitude disponible antes del body -->
+  <script src="https://cdn.amplitude.com/libs/analytics-browser-2.11.12-min.js.gz"></script>
+  <script src="https://cdn.amplitude.com/libs/plugin-session-replay-browser-1.13.10-min.js.gz"></script>
 
   <style>
     /* ===== RESET & TOKENS ===== */
@@ -743,47 +723,54 @@
 
 <script>
   // ============================================================
-  // AMPLITUDE — Web Experiment maneja init automáticamente
-  // Solo necesitamos esperar a que el SDK esté disponible
+  // AMPLITUDE — init síncrono (SDKs ya cargados en el <head>)
   // ============================================================
   var _ampReady = false;
   var _user     = { name: 'Usuario', email: 'usuario@payflow.com' };
 
-  // Helper de tracking — funciona una vez que el SDK cargó
+  (function initAmplitude() {
+    try {
+      // Session Replay SIEMPRE antes de amplitude.init()
+      try {
+        if (window.sessionReplay && window.sessionReplay.plugin) {
+          window.amplitude.add(window.sessionReplay.plugin({ sampleRate: 1 }));
+          console.log('[PayFlow] Session Replay plugin ✅');
+        } else {
+          console.warn('[PayFlow] sessionReplay no disponible (non-fatal)');
+        }
+      } catch(srErr) {
+        console.warn('[PayFlow] Session Replay error (non-fatal):', srErr.message);
+      }
+
+      // Inicializar Amplitude
+      window.amplitude.init('049f6232a504b04710662bc7dea55650', {
+        defaultTracking: { sessions: true, pageViews: true, formInteractions: true, fileDownloads: false },
+      });
+
+      _ampReady = true;
+      console.log('[PayFlow] Amplitude initialized ✅');
+    } catch(e) {
+      console.error('[PayFlow] Amplitude init FAILED:', e);
+    }
+  })();
+
+  // Actualizar badge una vez que el DOM esté listo
+  document.addEventListener('DOMContentLoaded', function() {
+    var b = document.getElementById('amp-badge');
+    if (!b) return;
+    b.querySelector('.amp-dot').style.background = _ampReady ? '#22C55E' : '#EF4444';
+    b.querySelector('span').textContent = _ampReady ? 'Amplitude activo ✓' : 'Amplitude offline';
+    if (_ampReady) track('Page Viewed', { page_name: 'Landing' });
+  });
+
   function track(eventName, props) {
     try {
       if (window.amplitude && window.amplitude.track) {
         window.amplitude.track(eventName, props || {});
         console.log('[PayFlow] ✅ Event:', eventName, props);
-      } else {
-        console.log('[PayFlow] ⏳ SDK no listo para:', eventName);
       }
     } catch(e) { console.warn('[PayFlow] Track error:', e.message); }
   }
-
-  // Polling: espera a que experiment.js haya cargado e inicializado amplitude
-  (function waitForAmp(n) {
-    if (window.amplitude && window.amplitude.track) {
-      _ampReady = true;
-      var b = document.getElementById('amp-badge');
-      if (b) {
-        b.querySelector('.amp-dot').style.background = '#22C55E';
-        b.querySelector('span').textContent = 'Amplitude activo ✓';
-      }
-      track('Page Viewed', { page_name: 'Landing' });
-      console.log('[PayFlow] Amplitude listo via Web Experiment ✅');
-    } else if (n < 50) {
-      setTimeout(function(){ waitForAmp(n + 1); }, 200);
-    } else {
-      // Timeout (~10s): SDK no cargó
-      var b = document.getElementById('amp-badge');
-      if (b) {
-        b.querySelector('.amp-dot').style.background = '#EF4444';
-        b.querySelector('span').textContent = 'Amplitude offline';
-      }
-      console.warn('[PayFlow] Amplitude no cargó tras 10s');
-    }
-  })(0);
 
   // ============================================================
   // NAVIGATION
