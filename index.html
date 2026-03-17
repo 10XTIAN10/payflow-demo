@@ -5,7 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PayFlow — Tu billetera digital</title>
 
-  <!-- Amplitude: carga síncrona — garantiza window.amplitude disponible antes del body -->
+  <!-- Amplitude Web Experiment: anti-flicker + experiment.js (requerido para Visual Editor) -->
+  <script>
+    (function(d, h){
+      var apiKey = "049f6232a504b04710662bc7dea55650";
+      var timeout = 1000;
+      var id = "amp-exp-css";
+      try {
+        if (!d.getElementById(id)) {
+          var st = d.createElement("style");
+          st.id = id;
+          st.innerText = "* { visibility: hidden !important; background-image: none !important; }";
+          h.appendChild(st);
+          window.setTimeout(function () { st.remove(); }, timeout);
+          var sc = d.createElement("script");
+          sc.src = "https://cdn.amplitude.com/script/" + apiKey + ".experiment.js";
+          sc.async = true;
+          sc.onerror = function () { st.remove(); };
+          h.insertBefore(sc, d.currentScript || h.lastChild);
+        }
+      } catch(e) { console.error(e); }
+    })(document, document.head);
+  </script>
+  <!-- Amplitude Analytics + Session Replay: fallback síncrono por si experiment.js tarda -->
   <script src="https://cdn.amplitude.com/libs/analytics-browser-2.11.12-min.js.gz"></script>
   <script src="https://cdn.amplitude.com/libs/plugin-session-replay-browser-1.13.10-min.js.gz"></script>
 
@@ -730,6 +752,14 @@
 
   (function initAmplitude() {
     try {
+      // Si experiment.js ya inicializó Amplitude, no volver a llamar init()
+      if (window.amplitude && window.amplitude.getSessionId && window.amplitude.getSessionId()) {
+        _ampReady = true;
+        console.log('[PayFlow] Amplitude ya inicializado por experiment.js ✅');
+        return;
+      }
+
+      // Fallback: inicializar con CDN síncrono
       // Session Replay SIEMPRE antes de amplitude.init()
       try {
         if (window.sessionReplay && window.sessionReplay.plugin) {
@@ -742,13 +772,12 @@
         console.warn('[PayFlow] Session Replay error (non-fatal):', srErr.message);
       }
 
-      // Inicializar Amplitude
       window.amplitude.init('049f6232a504b04710662bc7dea55650', {
         defaultTracking: { sessions: true, pageViews: true, formInteractions: true, fileDownloads: false },
       });
 
       _ampReady = true;
-      console.log('[PayFlow] Amplitude initialized ✅');
+      console.log('[PayFlow] Amplitude initialized via fallback CDN ✅');
     } catch(e) {
       console.error('[PayFlow] Amplitude init FAILED:', e);
     }
