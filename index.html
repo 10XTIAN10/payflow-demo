@@ -1,0 +1,942 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PayFlow — Tu billetera digital</title>
+
+  <!-- ✅ Web Experiment: anti-flicker + carga async del SDK (incluye Analytics + Session Replay) -->
+  <!-- DEBE ser el primer script del <head> -->
+  <script>
+    (function(d, h){
+      var apiKey = "049f6232a504b04710662bc7dea55650";
+      var timeout = 1000;
+      var id = "amp-exp-css";
+      try {
+        if (!d.getElementById(id)) {
+          var st = d.createElement("style");
+          st.id = id;
+          st.innerText = "* { visibility: hidden !important; background-image: none !important; }";
+          h.appendChild(st);
+          window.setTimeout(function () { st.remove(); }, timeout);
+          var sc = d.createElement("script");
+          sc.src = "https://cdn.amplitude.com/script/" + apiKey + ".experiment.js";
+          sc.async = true;
+          sc.onerror = function () { st.remove(); };
+          h.insertBefore(sc, d.currentScript || h.lastChild);
+        }
+      } catch(e) { console.error(e); }
+    })(document, document.head);
+  </script>
+
+  <style>
+    /* ===== RESET & TOKENS ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --purple:        #7C3AED;
+      --purple-l:      #8B5CF6;
+      --purple-d:      #5B21B6;
+      --blue:          #2563EB;
+      --blue-l:        #3B82F6;
+      --dark:          #0F0F1A;
+      --dark2:         #1A1A2E;
+      --gray:          #6B7280;
+      --gray-l:        #F3F4F6;
+      --gray-b:        #E5E7EB;
+      --white:         #FFFFFF;
+      --green:         #10B981;
+      --red:           #EF4444;
+      --amber:         #F59E0B;
+      --grad:          linear-gradient(135deg, #7C3AED, #2563EB);
+      --grad-soft:     linear-gradient(135deg, #7C3AED18, #2563EB18);
+      --r:             16px;
+      --r-sm:          8px;
+      --shadow:        0 4px 24px rgba(124,58,237,.15);
+      --shadow-card:   0 2px 12px rgba(0,0,0,.07);
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--gray-l); color: var(--dark); }
+
+    /* ===== VIEWS ===== */
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ===== BUTTONS ===== */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: 12px; font-weight: 700; font-size: 15px; cursor: pointer; border: none; transition: all .2s; text-decoration: none; }
+    .btn-primary  { background: var(--grad); color: #fff; }
+    .btn-primary:hover  { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,58,237,.4); }
+    .btn-secondary{ background: #fff; color: var(--purple); border: 2px solid var(--purple); }
+    .btn-secondary:hover { background: var(--grad-soft); }
+    .btn-ghost    { background: transparent; color: var(--gray); border: 2px solid var(--gray-b); }
+    .btn-ghost:hover { background: var(--gray-l); }
+    .btn-full     { width: 100%; }
+    .btn-sm       { padding: 10px 20px; font-size: 13px; }
+
+    /* ===== CARD ===== */
+    .card { background: var(--white); border-radius: var(--r); padding: 24px; box-shadow: var(--shadow-card); }
+
+    /* ===== INPUTS ===== */
+    .ig        { margin-bottom: 16px; }
+    .ig label  { display: block; font-size: 13px; font-weight: 600; color: var(--gray); margin-bottom: 6px; }
+    .ig input, .ig select {
+      width: 100%; padding: 14px 16px; border: 2px solid var(--gray-b); border-radius: 10px;
+      font-size: 15px; outline: none; transition: border-color .2s; background: #fff; color: var(--dark);
+    }
+    .ig input:focus, .ig select:focus { border-color: var(--purple); }
+    .ig input::placeholder { color: #9CA3AF; }
+
+    /* ===== TOAST ===== */
+    #toast {
+      position: fixed; top: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--dark); color: #fff; padding: 14px 24px; border-radius: 100px;
+      font-size: 14px; font-weight: 600; z-index: 9998; display: none; align-items: center;
+      gap: 10px; box-shadow: 0 8px 32px rgba(0,0,0,.25); white-space: nowrap;
+    }
+    #toast.show { display: flex; animation: slideDown .3s ease; }
+    @keyframes slideDown { from { top: 0; opacity: 0; } to { top: 24px; opacity: 1; } }
+
+    /* ===== AMPLITUDE BADGE ===== */
+    #amp-badge {
+      position: fixed; bottom: 24px; right: 24px; background: #1B1B1B; color: #fff;
+      border-radius: 12px; padding: 10px 16px; font-size: 12px; font-weight: 600;
+      z-index: 9999; display: flex; align-items: center; gap: 8px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.3); font-family: sans-serif;
+    }
+    .amp-dot { width: 8px; height: 8px; border-radius: 50%; background: #888; }
+
+    /* ===========================
+       LANDING
+    =========================== */
+    .landing { background: #fff; }
+
+    /* Navbar */
+    .nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px 48px; background: rgba(255,255,255,.96);
+      backdrop-filter: blur(12px); border-bottom: 1px solid var(--gray-b);
+    }
+    .nav-logo { font-size: 22px; font-weight: 900; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; cursor: pointer; }
+    .nav-links { display: flex; gap: 6px; align-items: center; }
+    .nav-links a { padding: 8px 16px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray); text-decoration: none; cursor: pointer; transition: all .2s; }
+    .nav-links a:hover { color: var(--purple); background: var(--grad-soft); }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 120px 24px 80px;
+      background: linear-gradient(180deg, #F5F3FF 0%, #EFF6FF 100%);
+    }
+    .hero-inner { max-width: 700px; }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px; background: #fff;
+      border: 1px solid var(--gray-b); border-radius: 100px; padding: 6px 16px;
+      font-size: 13px; font-weight: 600; color: var(--purple); margin-bottom: 28px;
+    }
+    .hero-badge-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; }
+    .hero h1 { font-size: clamp(44px, 6.5vw, 72px); font-weight: 900; line-height: 1.08; margin-bottom: 20px; }
+    .hero h1 span { background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .hero p { font-size: 18px; color: var(--gray); line-height: 1.75; margin-bottom: 40px; }
+    .hero-actions { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+    .hero-stats { display: flex; gap: 48px; justify-content: center; margin-top: 64px; flex-wrap: wrap; }
+    .stat-val { font-size: 30px; font-weight: 900; }
+    .stat-lbl { font-size: 13px; color: var(--gray); margin-top: 4px; }
+
+    /* Features */
+    .features { padding: 100px 48px; max-width: 1200px; margin: 0 auto; }
+    .section-title { text-align: center; font-size: 38px; font-weight: 800; margin-bottom: 12px; }
+    .section-sub { text-align: center; color: var(--gray); font-size: 17px; margin-bottom: 64px; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 24px; }
+    .feat-card { background: #fff; border-radius: 20px; padding: 32px; border: 1px solid var(--gray-b); transition: all .3s; cursor: pointer; }
+    .feat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); border-color: var(--purple-l); }
+    .feat-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 26px; margin-bottom: 20px; background: var(--grad-soft); }
+    .feat-card h3 { font-size: 18px; font-weight: 700; margin-bottom: 10px; }
+    .feat-card p { color: var(--gray); font-size: 14px; line-height: 1.65; }
+
+    /* Testimonials */
+    .testimonials-section { background: linear-gradient(135deg, var(--dark), var(--dark2)); padding: 80px 48px; }
+    .testimonials-section h2 { color: #fff; font-size: 34px; font-weight: 800; text-align: center; margin-bottom: 48px; }
+    .testimonials-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px,1fr)); gap: 20px; max-width: 1000px; margin: 0 auto; }
+    .testi { background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1); border-radius: 18px; padding: 28px; }
+    .testi-text { color: rgba(255,255,255,.85); font-size: 15px; line-height: 1.7; margin-bottom: 20px; }
+    .testi-author { display: flex; align-items: center; gap: 12px; }
+    .testi-avatar { width: 42px; height: 42px; border-radius: 50%; background: var(--grad); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 16px; }
+    .testi-name { color: #fff; font-weight: 600; font-size: 14px; }
+    .testi-role { color: rgba(255,255,255,.45); font-size: 12px; }
+
+    /* CTA bottom */
+    .cta-bottom { padding: 100px 48px; text-align: center; background: linear-gradient(135deg, #F5F3FF, #EFF6FF); }
+    .cta-bottom h2 { font-size: 42px; font-weight: 900; margin-bottom: 16px; }
+    .cta-bottom p { color: var(--gray); font-size: 17px; margin-bottom: 40px; }
+
+    /* ===========================
+       AUTH PAGES
+    =========================== */
+    .auth-page {
+      min-height: 100vh; display: flex; align-items: center; justify-content: center;
+      padding: 24px; background: linear-gradient(135deg, #F5F3FF 0%, #EFF6FF 100%);
+    }
+    .auth-card { background: #fff; border-radius: 24px; padding: 48px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(124,58,237,.15); }
+    .auth-logo { font-size: 26px; font-weight: 900; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 6px; }
+    .auth-sub { color: var(--gray); font-size: 14px; margin-bottom: 36px; }
+
+    /* Progress steps */
+    .steps { display: flex; align-items: center; margin-bottom: 36px; }
+    .step-it { display: flex; flex-direction: column; align-items: center; flex: 1; }
+    .step-c {
+      width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; transition: all .3s; border: 2px solid var(--gray-b); background: #fff; color: var(--gray);
+    }
+    .step-c.active { background: var(--grad); border-color: transparent; color: #fff; }
+    .step-c.done   { background: var(--green); border-color: transparent; color: #fff; }
+    .step-lbl { font-size: 11px; color: var(--gray); margin-top: 6px; font-weight: 500; }
+    .step-ln { flex: 1; height: 2px; background: var(--gray-b); margin-bottom: 20px; transition: background .3s; }
+    .step-ln.done { background: var(--green); }
+
+    /* Phone input */
+    .phone-wrap { display: flex; gap: 8px; }
+    .phone-pfx { padding: 14px 12px; border: 2px solid var(--gray-b); border-radius: 10px; font-size: 15px; background: var(--gray-l); font-weight: 600; white-space: nowrap; }
+
+    /* OTP */
+    .otp-wrap { display: flex; gap: 10px; justify-content: center; margin: 24px 0; }
+    .otp-in {
+      width: 52px; height: 60px; text-align: center; font-size: 26px; font-weight: 700;
+      border: 2px solid var(--gray-b); border-radius: 12px; outline: none; transition: all .2s;
+    }
+    .otp-in:focus { border-color: var(--purple); }
+    .otp-in.filled { border-color: var(--purple); background: #F5F3FF; }
+
+    /* ===========================
+       TRANSFER FLOW
+    =========================== */
+    .tx-header { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
+    .tx-header h2 { font-size: 22px; font-weight: 800; }
+    .back-btn { width: 40px; height: 40px; border-radius: 10px; border: none; background: var(--gray-l); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: background .2s; }
+    .back-btn:hover { background: var(--gray-b); }
+
+    .contacts-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 24px; }
+    .contact-btn { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 16px 6px; border-radius: 14px; border: 2px solid var(--gray-b); background: #fff; cursor: pointer; transition: all .2s; }
+    .contact-btn:hover, .contact-btn.sel { border-color: var(--purple); background: #F5F3FF; }
+    .contact-av { width: 46px; height: 46px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 17px; }
+    .contact-nm { font-size: 12px; font-weight: 600; }
+
+    .amount-display { text-align: center; padding: 28px; background: linear-gradient(135deg, #F5F3FF, #EFF6FF); border-radius: 20px; margin: 16px 0; }
+    .amount-lbl { font-size: 13px; color: var(--gray); font-weight: 500; margin-bottom: 8px; }
+    .amount-num { font-size: 54px; font-weight: 900; line-height: 1; }
+    .amount-cur { font-size: 24px; font-weight: 700; color: var(--purple); vertical-align: super; margin-right: 4px; }
+
+    .pad-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 8px; margin: 16px 0; }
+    .pad-btn { padding: 18px; border: none; background: var(--gray-l); border-radius: 12px; font-size: 20px; font-weight: 700; cursor: pointer; transition: all .2s; color: var(--dark); }
+    .pad-btn:hover { background: #E9D5FF; color: var(--purple); }
+
+    .tx-summary { background: var(--gray-l); border-radius: 16px; padding: 20px; margin: 20px 0; }
+    .sum-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; }
+    .sum-row + .sum-row { border-top: 1px solid var(--gray-b); }
+    .sum-lbl { font-size: 14px; color: var(--gray); }
+    .sum-val { font-size: 14px; font-weight: 600; }
+
+    .success-sc { text-align: center; padding: 32px 16px; }
+    .success-ic { width: 80px; height: 80px; border-radius: 50%; background: var(--green); display: flex; align-items: center; justify-content: center; font-size: 36px; margin: 0 auto 24px; }
+
+    /* ===========================
+       DASHBOARD
+    =========================== */
+    .dash-layout { display: flex; min-height: 100vh; }
+
+    .sidebar {
+      width: 260px; background: var(--dark); min-height: 100vh;
+      padding: 28px 20px 100px; position: fixed; top: 0; left: 0; z-index: 50;
+    }
+    .sb-logo { font-size: 22px; font-weight: 900; background: var(--grad); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; margin-bottom: 40px; padding: 0 12px; }
+    .sb-nav { display: flex; flex-direction: column; gap: 4px; }
+    .sb-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-radius: 10px; color: rgba(255,255,255,.55); font-size: 14px; font-weight: 500; cursor: pointer; transition: all .2s; border: none; background: transparent; width: 100%; }
+    .sb-item:hover { background: rgba(255,255,255,.08); color: #fff; }
+    .sb-item.active { background: rgba(124,58,237,.3); color: #fff; }
+    .sb-icon { font-size: 18px; width: 24px; text-align: center; }
+    .sb-div { height: 1px; background: rgba(255,255,255,.1); margin: 16px 0; }
+    .sb-user { position: absolute; bottom: 24px; left: 20px; right: 20px; display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(255,255,255,.08); border-radius: 12px; }
+    .sb-av { width: 36px; height: 36px; border-radius: 50%; background: var(--grad); display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 14px; flex-shrink: 0; }
+    .sb-name  { color: #fff; font-size: 13px; font-weight: 600; }
+    .sb-email { color: rgba(255,255,255,.4); font-size: 11px; }
+
+    .dash-main { margin-left: 260px; flex: 1; padding: 40px; }
+    .dash-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+    .dash-greet h1 { font-size: 26px; font-weight: 800; }
+    .dash-greet p { color: var(--gray); font-size: 14px; margin-top: 4px; }
+
+    .balance-card {
+      background: var(--grad); border-radius: 24px; padding: 36px; color: #fff;
+      margin-bottom: 32px; position: relative; overflow: hidden;
+    }
+    .balance-card::after  { content: ''; position: absolute; top: -60px; right: -60px; width: 200px; height: 200px; border-radius: 50%; background: rgba(255,255,255,.08); }
+    .balance-card::before { content: ''; position: absolute; bottom: -40px; left: 45%; width: 180px; height: 180px; border-radius: 50%; background: rgba(255,255,255,.06); }
+    .bal-lbl { font-size: 13px; opacity: .8; font-weight: 500; margin-bottom: 8px; }
+    .bal-amt { font-size: 50px; font-weight: 900; margin-bottom: 28px; position: relative; z-index: 1; }
+    .bal-actions { display: flex; gap: 10px; flex-wrap: wrap; position: relative; z-index: 1; }
+    .bal-btn { display: flex; align-items: center; gap: 8px; padding: 10px 20px; background: rgba(255,255,255,.14); border: none; border-radius: 10px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .2s; backdrop-filter: blur(8px); }
+    .bal-btn:hover { background: rgba(255,255,255,.26); }
+
+    .dash-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 32px; }
+
+    .sec-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .sec-head h3 { font-size: 18px; font-weight: 700; }
+    .sec-head a  { font-size: 13px; color: var(--purple); cursor: pointer; font-weight: 600; text-decoration: none; }
+
+    .txs { display: flex; flex-direction: column; }
+    .tx-item { display: flex; align-items: center; gap: 14px; padding: 14px 12px; border-radius: 12px; cursor: pointer; transition: background .2s; }
+    .tx-item:hover { background: var(--gray-l); }
+    .tx-ico { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+    .tx-info { flex: 1; }
+    .tx-nm { font-size: 14px; font-weight: 600; }
+    .tx-dt { font-size: 12px; color: var(--gray); margin-top: 2px; }
+    .tx-amt { font-size: 15px; font-weight: 700; }
+    .debit  { color: var(--red); }
+    .credit { color: var(--green); }
+
+    .qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .qa-card { background: #fff; border: 1px solid var(--gray-b); border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all .2s; }
+    .qa-card:hover { border-color: var(--purple); transform: translateY(-2px); box-shadow: var(--shadow); }
+    .qa-ico { width: 44px; height: 44px; border-radius: 12px; background: var(--grad-soft); display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+    .qa-nm  { font-size: 13px; font-weight: 700; }
+    .qa-ds  { font-size: 11px; color: var(--gray); margin-top: 2px; }
+
+    .promo-card { margin-top: 16px; background: var(--grad); border-radius: 16px; padding: 20px; color: #fff; cursor: pointer; transition: opacity .2s; }
+    .promo-card:hover { opacity: .9; }
+    .promo-tag { font-size: 11px; opacity: .8; font-weight: 700; letter-spacing: .8px; margin-bottom: 6px; }
+    .promo-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .promo-desc { font-size: 13px; opacity: .85; }
+
+    @media (max-width: 768px) {
+      .nav { padding: 16px 20px; }
+      .dash-grid { grid-template-columns: 1fr; }
+      .sidebar { display: none; }
+      .dash-main { margin-left: 0; padding: 20px; }
+      .contacts-grid { grid-template-columns: repeat(4,1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toast -->
+<div id="toast">
+  <span id="toast-ico">✅</span>
+  <span id="toast-txt">Listo</span>
+</div>
+
+<!-- ==================== LANDING ==================== -->
+<div id="view-landing" class="view active landing">
+
+  <nav class="nav">
+    <div class="nav-logo" onclick="go('landing')">PayFlow</div>
+    <div class="nav-links">
+      <a onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'}); track('Feature Used',{feature:'scroll_features'})">Producto</a>
+      <a onclick="document.getElementById('testi').scrollIntoView({behavior:'smooth'}); track('Feature Used',{feature:'scroll_testi'})">Clientes</a>
+      <a onclick="go('signup'); track('Sign Up Started',{source:'navbar'})">Crear cuenta</a>
+      <a onclick="go('dashboard')" class="btn btn-primary btn-sm" style="color:#fff; margin-left:4px;">Ingresar →</a>
+    </div>
+  </nav>
+
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="hero-badge">
+        <div class="hero-badge-dot"></div>
+        Disponible en Argentina, México y Colombia
+      </div>
+      <h1>Tu dinero,<br><span>sin límites</span></h1>
+      <p>PayFlow es la billetera digital que te permite enviar dinero, pagar servicios e invertir desde un solo lugar. Rápido, seguro y sin comisiones.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary" onclick="go('signup'); track('Sign Up Started',{source:'hero_cta_primary'})">Crear cuenta gratis</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('features').scrollIntoView({behavior:'smooth'})">Ver cómo funciona</button>
+      </div>
+      <div class="hero-stats">
+        <div><div class="stat-val">+4.2M</div><div class="stat-lbl">Usuarios activos</div></div>
+        <div><div class="stat-val">$9.8B</div><div class="stat-lbl">Procesados en 2025</div></div>
+        <div><div class="stat-val">0%</div><div class="stat-lbl">Comisión en transferencias</div></div>
+        <div><div class="stat-val">4.9★</div><div class="stat-lbl">Rating en App Stores</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="features" id="features">
+    <h2 class="section-title">Todo lo que necesitás en un lugar</h2>
+    <p class="section-sub">PayFlow fue diseñado para simplificar tu relación con el dinero</p>
+    <div class="features-grid">
+      <div class="feat-card" onclick="track('Feature Used',{feature:'transfers',source:'landing'})">
+        <div class="feat-icon">💸</div>
+        <h3>Transferencias instantáneas</h3>
+        <p>Enviá dinero a cualquier persona en segundos, sin importar el banco. Disponible 24/7, sin filas ni esperas.</p>
+      </div>
+      <div class="feat-card" onclick="track('Feature Used',{feature:'payments',source:'landing'})">
+        <div class="feat-icon">⚡</div>
+        <h3>Pago de servicios</h3>
+        <p>Pagá luz, gas, internet y más de 500 servicios sin moverte de tu casa. Recordatorios automáticos antes del vencimiento.</p>
+      </div>
+      <div class="feat-card" onclick="track('Feature Used',{feature:'investments',source:'landing'})">
+        <div class="feat-icon">📈</div>
+        <h3>Invertí tu saldo</h3>
+        <p>Tu plata trabaja mientras dormís. Rendimiento diario automático en fondos de bajo riesgo. Sin mínimos.</p>
+      </div>
+      <div class="feat-card" onclick="track('Feature Used',{feature:'card',source:'landing'})">
+        <div class="feat-icon">💳</div>
+        <h3>Tarjeta PayFlow Visa</h3>
+        <p>Tarjeta prepaga Visa para usar en comercios físicos y online. 5% de cashback en tus primeras compras.</p>
+      </div>
+      <div class="feat-card" onclick="track('Feature Used',{feature:'security',source:'landing'})">
+        <div class="feat-icon">🔐</div>
+        <h3>Seguridad bancaria</h3>
+        <p>Encriptación end-to-end, autenticación biométrica y alertas en tiempo real en cada movimiento.</p>
+      </div>
+      <div class="feat-card" onclick="track('Feature Used',{feature:'qr',source:'landing'})">
+        <div class="feat-icon">📱</div>
+        <h3>Cobro con QR</h3>
+        <p>Generá tu QR personalizado y cobrá en segundos. Ideal para emprendedores, profesionales y negocios.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="testimonials-section" id="testi">
+    <h2>Lo que dicen nuestros usuarios</h2>
+    <div class="testimonials-grid">
+      <div class="testi">
+        <p class="testi-text">"Desde que uso PayFlow dejé de ir al banco. Las transferencias son instantáneas y nunca tuve un problema. Lo recomiendo a todos mis clientes."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">M</div>
+          <div><div class="testi-name">Martina García</div><div class="testi-role">Freelancer, Buenos Aires</div></div>
+        </div>
+      </div>
+      <div class="testi">
+        <p class="testi-text">"Uso PayFlow para cobrarle a mis clientes con QR. Es rapidísimo y el dinero entra al instante. La mejor herramienta para mi negocio."</p>
+        <div class="testi-author">
+          <div class="testi-avatar">L</div>
+          <div><div class="testi-name">Lucas Romero</div><div class="testi-role">Dueño de cafetería, Córdoba</div></div>
+        </div>
+      </div>
+      <div class="testi">
+        <p class="testi-text">"El rendimiento de PayFlow me convenció. En un mes generé más que con mi caja de ahorro en el banco en 6 meses. ¡Increíble!"</p>
+        <div class="testi-author">
+          <div class="testi-avatar">S</div>
+          <div><div class="testi-name">Sofía Méndez</div><div class="testi-role">Contadora, Rosario</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="cta-bottom">
+    <h2>Empezá hoy, es gratis</h2>
+    <p>Más de 4 millones de personas ya confían en PayFlow.<br>Abrí tu cuenta en menos de 2 minutos.</p>
+    <button class="btn btn-primary" onclick="go('signup'); track('Sign Up Started',{source:'bottom_cta'})">Crear mi cuenta gratis →</button>
+  </section>
+</div>
+
+<!-- ==================== SIGNUP ==================== -->
+<div id="view-signup" class="view">
+  <div class="auth-page">
+    <div class="auth-card">
+      <div class="auth-logo">PayFlow</div>
+      <div class="auth-sub" id="su-sub">Creá tu cuenta en minutos</div>
+
+      <!-- Steps -->
+      <div class="steps">
+        <div class="step-it">
+          <div class="step-c active" id="sc1">1</div>
+          <div class="step-lbl">Cuenta</div>
+        </div>
+        <div class="step-ln" id="sl1"></div>
+        <div class="step-it">
+          <div class="step-c" id="sc2">2</div>
+          <div class="step-lbl">Datos</div>
+        </div>
+        <div class="step-ln" id="sl2"></div>
+        <div class="step-it">
+          <div class="step-c" id="sc3">3</div>
+          <div class="step-lbl">Verificación</div>
+        </div>
+      </div>
+
+      <!-- STEP 1 -->
+      <div id="su1">
+        <div class="ig"><label>Email</label><input type="email" id="su-email" placeholder="tu@email.com"></div>
+        <div class="ig"><label>Contraseña</label><input type="password" id="su-pass" placeholder="Mínimo 8 caracteres"></div>
+        <div class="ig"><label>Confirmar contraseña</label><input type="password" id="su-pass2" placeholder="Repetí tu contraseña"></div>
+        <button class="btn btn-primary btn-full" onclick="suGo(2)">Continuar →</button>
+        <p style="text-align:center; margin-top:16px; font-size:13px; color:var(--gray)">
+          ¿Ya tenés cuenta? <a onclick="go('dashboard')" style="color:var(--purple);cursor:pointer;font-weight:600">Ingresá</a>
+        </p>
+      </div>
+
+      <!-- STEP 2 -->
+      <div id="su2" style="display:none">
+        <div class="ig"><label>Nombre completo</label><input type="text" id="su-name" placeholder="Ej: María González"></div>
+        <div class="ig"><label>DNI / CUIL</label><input type="text" id="su-dni" placeholder="Sin puntos ni guiones"></div>
+        <div class="ig"><label>Fecha de nacimiento</label><input type="date" id="su-birth"></div>
+        <div class="ig">
+          <label>Teléfono</label>
+          <div class="phone-wrap">
+            <span class="phone-pfx">🇦🇷 +54</span>
+            <input type="tel" id="su-phone" placeholder="11 2345-6789" style="flex:1">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="suGo(3)">Continuar →</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="suGo(1,true)">← Volver</button>
+      </div>
+
+      <!-- STEP 3 -->
+      <div id="su3" style="display:none">
+        <div style="text-align:center; margin-bottom:20px">
+          <div style="font-size:44px; margin-bottom:12px">📱</div>
+          <h3 style="font-weight:700; margin-bottom:8px">Verificá tu número</h3>
+          <p style="color:var(--gray); font-size:14px">Enviamos un código de 6 dígitos a <strong id="ph-hint">tu teléfono</strong></p>
+        </div>
+        <div class="otp-wrap">
+          <input class="otp-in" maxlength="1" id="otp0" oninput="otpNext(0)" type="text" inputmode="numeric">
+          <input class="otp-in" maxlength="1" id="otp1" oninput="otpNext(1)" type="text" inputmode="numeric">
+          <input class="otp-in" maxlength="1" id="otp2" oninput="otpNext(2)" type="text" inputmode="numeric">
+          <input class="otp-in" maxlength="1" id="otp3" oninput="otpNext(3)" type="text" inputmode="numeric">
+          <input class="otp-in" maxlength="1" id="otp4" oninput="otpNext(4)" type="text" inputmode="numeric">
+          <input class="otp-in" maxlength="1" id="otp5" oninput="otpNext(5)" type="text" inputmode="numeric">
+        </div>
+        <p style="text-align:center; font-size:13px; color:var(--gray); margin-bottom:24px">
+          ¿No recibiste el código? <a style="color:var(--purple);cursor:pointer;font-weight:600" onclick="toast('Código reenviado','📨')">Reenviar</a>
+        </p>
+        <button class="btn btn-primary btn-full" onclick="suComplete()">Verificar y crear cuenta ✓</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="suGo(2,true)">← Volver</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TRANSFER ==================== -->
+<div id="view-transfer" class="view">
+  <div class="auth-page" style="background: var(--gray-l)">
+    <div class="auth-card" style="max-width:520px">
+
+      <!-- Step 1: contact -->
+      <div id="tx1">
+        <div class="tx-header">
+          <button class="back-btn" onclick="go('dashboard')">←</button>
+          <h2>¿A quién transferís?</h2>
+        </div>
+        <div class="ig">
+          <label>Buscar contacto, alias o CVU</label>
+          <input type="text" placeholder="Nombre, alias o CVU..." oninput="if(this.value.length>2) track('Search Performed',{search_term:this.value,results_count:5,context:'transfer'})">
+        </div>
+        <p style="font-size:12px; font-weight:700; color:var(--gray); margin-bottom:12px; letter-spacing:.6px">RECIENTES</p>
+        <div class="contacts-grid">
+          <button class="contact-btn" onclick="selContact('Ana P.','#7C3AED')">
+            <div class="contact-av" style="background:#7C3AED">A</div>
+            <span class="contact-nm">Ana P.</span>
+          </button>
+          <button class="contact-btn" onclick="selContact('Carlos M.','#2563EB')">
+            <div class="contact-av" style="background:#2563EB">C</div>
+            <span class="contact-nm">Carlos M.</span>
+          </button>
+          <button class="contact-btn" onclick="selContact('Laura V.','#10B981')">
+            <div class="contact-av" style="background:#10B981">L</div>
+            <span class="contact-nm">Laura V.</span>
+          </button>
+          <button class="contact-btn" onclick="selContact('Tomás R.','#F59E0B')">
+            <div class="contact-av" style="background:#F59E0B">T</div>
+            <span class="contact-nm">Tomás R.</span>
+          </button>
+        </div>
+        <div style="padding:16px; border:2px dashed var(--gray-b); border-radius:14px; text-align:center; color:var(--gray); font-size:14px; cursor:pointer;" onclick="track('Feature Used',{feature:'new_contact_cvu'})">
+          + Nuevo destinatario con CBU/CVU
+        </div>
+      </div>
+
+      <!-- Step 2: amount -->
+      <div id="tx2" style="display:none">
+        <div class="tx-header">
+          <button class="back-btn" onclick="txGo(1)">←</button>
+          <h2>¿Cuánto enviás?</h2>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; background:var(--gray-l); border-radius:12px; padding:12px 16px; margin-bottom:20px;">
+          <div class="contact-av" id="tx-av" style="background:var(--purple);width:40px;height:40px;flex-shrink:0">A</div>
+          <div>
+            <div style="font-weight:700; font-size:14px" id="tx-nm">Ana P.</div>
+            <div style="color:var(--gray); font-size:12px">CVU: 0000003100016312345678</div>
+          </div>
+        </div>
+        <div class="amount-display">
+          <div class="amount-lbl">Monto a transferir</div>
+          <div><span class="amount-cur">$</span><span class="amount-num" id="amt-disp">0</span></div>
+        </div>
+        <div class="pad-grid">
+          <button class="pad-btn" onclick="pad('1')">1</button>
+          <button class="pad-btn" onclick="pad('2')">2</button>
+          <button class="pad-btn" onclick="pad('3')">3</button>
+          <button class="pad-btn" onclick="pad('4')">4</button>
+          <button class="pad-btn" onclick="pad('5')">5</button>
+          <button class="pad-btn" onclick="pad('6')">6</button>
+          <button class="pad-btn" onclick="pad('7')">7</button>
+          <button class="pad-btn" onclick="pad('8')">8</button>
+          <button class="pad-btn" onclick="pad('9')">9</button>
+          <button class="pad-btn" onclick="pad(',')"> , </button>
+          <button class="pad-btn" onclick="pad('0')">0</button>
+          <button class="pad-btn" onclick="padDel()">⌫</button>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="txGo(3)">Continuar →</button>
+      </div>
+
+      <!-- Step 3: confirm -->
+      <div id="tx3" style="display:none">
+        <div class="tx-header">
+          <button class="back-btn" onclick="txGo(2)">←</button>
+          <h2>Confirmá la transferencia</h2>
+        </div>
+        <div class="tx-summary">
+          <div class="sum-row"><span class="sum-lbl">Destinatario</span><span class="sum-val" id="conf-nm">—</span></div>
+          <div class="sum-row"><span class="sum-lbl">Monto</span><span class="sum-val" id="conf-amt" style="color:var(--purple);font-size:18px">$0</span></div>
+          <div class="sum-row"><span class="sum-lbl">Comisión</span><span class="sum-val" style="color:var(--green)">Sin cargo ✓</span></div>
+          <div class="sum-row"><span class="sum-lbl">Tiempo estimado</span><span class="sum-val">Instantáneo</span></div>
+        </div>
+        <div class="ig">
+          <label>Concepto (opcional)</label>
+          <input type="text" placeholder="Ej: Mitad de la cena, alquiler...">
+        </div>
+        <button class="btn btn-primary btn-full" onclick="txConfirm()">Confirmar transferencia →</button>
+        <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="txGo(2)">← Cambiar monto</button>
+      </div>
+
+      <!-- Step 4: success -->
+      <div id="tx4" style="display:none">
+        <div class="success-sc">
+          <div class="success-ic">✓</div>
+          <h2>¡Transferencia exitosa!</h2>
+          <p id="tx-ok-text" style="color:var(--gray); margin-top:8px; margin-bottom:24px">Enviaste $0 a Ana P.</p>
+          <div class="tx-summary" style="text-align:left; margin-bottom:24px">
+            <div class="sum-row"><span class="sum-lbl">Estado</span><span class="sum-val" style="color:var(--green)">✓ Acreditado</span></div>
+            <div class="sum-row"><span class="sum-lbl">Referencia</span><span class="sum-val">#PF-<span id="ref-n">892341</span></span></div>
+          </div>
+          <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap">
+            <button class="btn btn-primary" onclick="go('dashboard')">Ir al inicio</button>
+            <button class="btn btn-secondary" onclick="txGo(1)">Nueva transferencia</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== DASHBOARD ==================== -->
+<div id="view-dashboard" class="view">
+  <div class="dash-layout">
+    <aside class="sidebar">
+      <div class="sb-logo">PayFlow</div>
+      <nav class="sb-nav">
+        <button class="sb-item active"><span class="sb-icon">🏠</span>Inicio</button>
+        <button class="sb-item" onclick="go('transfer'); track('Transfer Initiated',{source:'sidebar'})"><span class="sb-icon">💸</span>Transferir</button>
+        <button class="sb-item" onclick="toast('Pago de servicios próximamente','⚡'); track('Feature Used',{feature:'services'})"><span class="sb-icon">⚡</span>Pagar servicios</button>
+        <button class="sb-item" onclick="toast('Mostrando tu QR de cobro','📱'); track('Feature Used',{feature:'qr_cobro'})"><span class="sb-icon">📱</span>Cobrar con QR</button>
+        <div class="sb-div"></div>
+        <button class="sb-item" onclick="toast('Rendimiento actual: +2.8% mensual','📈'); track('Feature Used',{feature:'investments'})"><span class="sb-icon">📈</span>Inversiones</button>
+        <button class="sb-item" onclick="toast('Tarjeta Visa: últimos 4 dígitos 4421','💳'); track('Feature Used',{feature:'card'})"><span class="sb-icon">💳</span>Mi tarjeta</button>
+        <button class="sb-item" onclick="toast('Mostrando historial completo','📋'); track('Feature Used',{feature:'activity'})"><span class="sb-icon">📋</span>Actividad</button>
+        <div class="sb-div"></div>
+        <button class="sb-item" onclick="go('landing'); track('Feature Used',{feature:'logout'})"><span class="sb-icon">🚪</span>Salir</button>
+      </nav>
+      <div class="sb-user">
+        <div class="sb-av" id="sb-av">U</div>
+        <div>
+          <div class="sb-name" id="sb-name">Usuario</div>
+          <div class="sb-email" id="sb-email">usuario@email.com</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="dash-main">
+      <div class="dash-head">
+        <div class="dash-greet">
+          <h1 id="dash-greet">¡Buen día, Usuario! 👋</h1>
+          <p>Aquí está el resumen de tu cuenta</p>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="go('transfer'); track('Transfer Initiated',{source:'dashboard_header'})">💸 Transferir</button>
+      </div>
+
+      <!-- Balance -->
+      <div class="balance-card">
+        <div class="bal-lbl">SALDO DISPONIBLE</div>
+        <div class="bal-amt">$148.320,50</div>
+        <div class="bal-actions">
+          <button class="bal-btn" onclick="go('transfer'); track('Transfer Initiated',{source:'balance_card'})">↑ Transferir</button>
+          <button class="bal-btn" onclick="toast('CVU copiado al portapapeles','📋'); track('Feature Used',{feature:'receive_money'})">↓ Recibir</button>
+          <button class="bal-btn" onclick="toast('Escaneando QR...','📷'); track('Feature Used',{feature:'pay_qr'})">📷 Pagar QR</button>
+          <button class="bal-btn" onclick="toast('Inversión activa · +2.8% mensual','📈'); track('Balance Viewed',{context:'detail'})">📈 Rendimiento</button>
+        </div>
+      </div>
+
+      <!-- Grid -->
+      <div class="dash-grid">
+        <!-- Transactions -->
+        <div>
+          <div class="sec-head">
+            <h3>Últimos movimientos</h3>
+            <a onclick="toast('Cargando historial completo...','📋'); track('Feature Used',{feature:'full_activity'})">Ver todos →</a>
+          </div>
+          <div class="card" style="padding:12px">
+            <div class="txs">
+              <div class="tx-item" onclick="track('Feature Used',{feature:'tx_detail',tx_id:'tx001'})">
+                <div class="tx-ico" style="background:#FEF9C3">🛒</div>
+                <div class="tx-info"><div class="tx-nm">Mercado Libre</div><div class="tx-dt">Hoy, 14:32</div></div>
+                <div class="tx-amt debit">-$4.299</div>
+              </div>
+              <div class="tx-item" onclick="track('Feature Used',{feature:'tx_detail',tx_id:'tx002'})">
+                <div class="tx-ico" style="background:#DCFCE7">💰</div>
+                <div class="tx-info"><div class="tx-nm">Transferencia recibida</div><div class="tx-dt">Ayer, 18:05 · Carlos M.</div></div>
+                <div class="tx-amt credit">+$15.000</div>
+              </div>
+              <div class="tx-item" onclick="track('Feature Used',{feature:'tx_detail',tx_id:'tx003'})">
+                <div class="tx-ico" style="background:#FEE2E2">⚡</div>
+                <div class="tx-info"><div class="tx-nm">EDENOR – Factura</div><div class="tx-dt">Lun 15 mar · Pago vencimiento</div></div>
+                <div class="tx-amt debit">-$2.840</div>
+              </div>
+              <div class="tx-item" onclick="track('Feature Used',{feature:'tx_detail',tx_id:'tx004'})">
+                <div class="tx-ico" style="background:#F3E8FF">💸</div>
+                <div class="tx-info"><div class="tx-nm">Transferencia a Ana P.</div><div class="tx-dt">Dom 14 mar</div></div>
+                <div class="tx-amt debit">-$8.500</div>
+              </div>
+              <div class="tx-item" onclick="track('Feature Used',{feature:'tx_detail',tx_id:'tx005'})">
+                <div class="tx-ico" style="background:#DCFCE7">📈</div>
+                <div class="tx-info"><div class="tx-nm">Rendimiento FCI PayFlow</div><div class="tx-dt">Vie 12 mar · Acreditación diaria</div></div>
+                <div class="tx-amt credit">+$1.204</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Quick actions -->
+        <div>
+          <div class="sec-head"><h3>Acciones rápidas</h3></div>
+          <div class="qa-grid">
+            <div class="qa-card" onclick="go('transfer'); track('Transfer Initiated',{source:'quick_actions'})">
+              <div class="qa-ico">💸</div>
+              <div><div class="qa-nm">Transferir</div><div class="qa-ds">Enviar dinero al instante</div></div>
+            </div>
+            <div class="qa-card" onclick="toast('Próximamente: Pago de servicios','⚡'); track('Feature Used',{feature:'pay_services_qa'})">
+              <div class="qa-ico">⚡</div>
+              <div><div class="qa-nm">Pagar servicio</div><div class="qa-ds">+500 servicios</div></div>
+            </div>
+            <div class="qa-card" onclick="toast('Recarga iniciada 📲','📲'); track('Feature Used',{feature:'recharge_phone'})">
+              <div class="qa-ico">📲</div>
+              <div><div class="qa-nm">Recargar celular</div><div class="qa-ds">Todas las operadoras</div></div>
+            </div>
+            <div class="qa-card" onclick="toast('Rendimiento actual: 2.8% mensual','📊'); track('Feature Used',{feature:'invest_qa'})">
+              <div class="qa-ico">📊</div>
+              <div><div class="qa-nm">Invertir</div><div class="qa-ds">Desde $100</div></div>
+            </div>
+          </div>
+          <div class="promo-card" onclick="toast('Pedido tu Tarjeta Visa PayFlow ✅','💳'); track('Feature Used',{feature:'promo_visa_card'})">
+            <div class="promo-tag">💳 NOVEDAD</div>
+            <div class="promo-title">Tarjeta PayFlow Visa</div>
+            <div class="promo-desc">5% de cashback en tus primeras 5 compras. Pedí la tuya →</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- Amplitude Badge -->
+<div id="amp-badge">
+  <div class="amp-dot"></div>
+  <span>Amplitude cargando...</span>
+</div>
+
+<script>
+  // ============================================================
+  // AMPLITUDE — Web Experiment maneja init automáticamente
+  // Solo necesitamos esperar a que el SDK esté disponible
+  // ============================================================
+  var _ampReady = false;
+  var _user     = { name: 'Usuario', email: 'usuario@payflow.com' };
+
+  // Helper de tracking — funciona una vez que el SDK cargó
+  function track(eventName, props) {
+    try {
+      if (window.amplitude && window.amplitude.track) {
+        window.amplitude.track(eventName, props || {});
+        console.log('[PayFlow] ✅ Event:', eventName, props);
+      } else {
+        console.log('[PayFlow] ⏳ SDK no listo para:', eventName);
+      }
+    } catch(e) { console.warn('[PayFlow] Track error:', e.message); }
+  }
+
+  // Polling: espera a que experiment.js haya cargado e inicializado amplitude
+  (function waitForAmp(n) {
+    if (window.amplitude && window.amplitude.track) {
+      _ampReady = true;
+      var b = document.getElementById('amp-badge');
+      if (b) {
+        b.querySelector('.amp-dot').style.background = '#22C55E';
+        b.querySelector('span').textContent = 'Amplitude activo ✓';
+      }
+      track('Page Viewed', { page_name: 'Landing' });
+      console.log('[PayFlow] Amplitude listo via Web Experiment ✅');
+    } else if (n < 50) {
+      setTimeout(function(){ waitForAmp(n + 1); }, 200);
+    } else {
+      // Timeout (~10s): SDK no cargó
+      var b = document.getElementById('amp-badge');
+      if (b) {
+        b.querySelector('.amp-dot').style.background = '#EF4444';
+        b.querySelector('span').textContent = 'Amplitude offline';
+      }
+      console.warn('[PayFlow] Amplitude no cargó tras 10s');
+    }
+  })(0);
+
+  // ============================================================
+  // NAVIGATION
+  // ============================================================
+  function go(view) {
+    document.querySelectorAll('.view').forEach(function(v){ v.classList.remove('active'); });
+    var el = document.getElementById('view-' + view);
+    if (el) { el.classList.add('active'); window.scrollTo(0,0); }
+    var names = { landing:'Landing', signup:'Signup', transfer:'Transfer', dashboard:'Dashboard' };
+    if (view !== 'landing') track('Page Viewed', { page_name: names[view] || view });
+  }
+
+  // ============================================================
+  // TOAST
+  // ============================================================
+  function toast(msg, ico) {
+    var t = document.getElementById('toast');
+    document.getElementById('toast-ico').textContent = ico || '✅';
+    document.getElementById('toast-txt').textContent = msg;
+    t.classList.add('show');
+    setTimeout(function(){ t.classList.remove('show'); }, 3000);
+  }
+
+  // ============================================================
+  // SIGNUP FLOW
+  // ============================================================
+  function suGo(step, back) {
+    ['su1','su2','su3'].forEach(function(id){ document.getElementById(id).style.display = 'none'; });
+    document.getElementById('su' + step).style.display = 'block';
+
+    for (var i = 1; i <= 3; i++) {
+      var c = document.getElementById('sc'+i), l = document.getElementById('sl'+i);
+      if (i < step)      { c.className = 'step-c done'; c.textContent = '✓'; }
+      else if (i === step){ c.className = 'step-c active'; c.textContent = i; }
+      else               { c.className = 'step-c'; c.textContent = i; }
+      if (l) l.className = i < step ? 'step-ln done' : 'step-ln';
+    }
+
+    if (!back) {
+      var names = {1:'Credenciales', 2:'Datos personales', 3:'Verificación telefónica'};
+      if (step > 1) track('Sign Up Step Completed', { step: step-1, step_name: names[step-1] });
+    }
+    if (step === 1 && !back) track('Sign Up Started', { source: 'signup_page' });
+    if (step === 3) {
+      var ph = document.getElementById('su-phone').value || 'tu teléfono';
+      document.getElementById('ph-hint').textContent = '+54 ' + ph;
+    }
+  }
+
+  function otpNext(i) {
+    var el = document.getElementById('otp'+i);
+    if (el.value) { el.classList.add('filled'); if (i < 5) document.getElementById('otp'+(i+1)).focus(); }
+    if (i === 5 && el.value) track('Sign Up Step Completed', { step: 3, step_name: 'OTP ingresado' });
+  }
+
+  function suComplete() {
+    var email = document.getElementById('su-email').value  || 'demo@payflow.com';
+    var name  = document.getElementById('su-name').value   || 'Usuario Demo';
+    _user = { name: name, email: email };
+
+    // Identify in Amplitude
+    try {
+      if (window.amplitude && window.amplitude.Identify) {
+        var id = new window.amplitude.Identify();
+        id.set('email', email);
+        id.set('name', name);
+        id.set('signup_date', new Date().toISOString());
+        id.set('plan', 'free');
+        id.set('app', 'PayFlow');
+        window.amplitude.identify(id);
+        window.amplitude.setUserId(email);
+      }
+    } catch(e){ console.warn('[PayFlow] Identify error:', e.message); }
+
+    track('Sign Up Step Completed', { step: 3, step_name: 'Verificación telefónica' });
+    track('Sign Up Completed', { method: 'email', user_email: email });
+
+    // Update dashboard
+    var first  = name.split(' ')[0];
+    var hour   = new Date().getHours();
+    var gr     = hour < 12 ? 'Buen día' : hour < 19 ? 'Buenas tardes' : 'Buenas noches';
+    document.getElementById('dash-greet').textContent = '¡' + gr + ', ' + first + '! 👋';
+    document.getElementById('sb-name').textContent  = name;
+    document.getElementById('sb-email').textContent = email;
+    document.getElementById('sb-av').textContent    = name.charAt(0).toUpperCase();
+
+    toast('¡Cuenta creada! Bienvenido/a a PayFlow 🎉', '🎉');
+    go('dashboard');
+    track('Page Viewed', { page_name: 'Dashboard', first_login: true });
+  }
+
+  // ============================================================
+  // TRANSFER FLOW
+  // ============================================================
+  var txData = { contact: '', color: '', amount: '' };
+  var amtStr = '';
+
+  function selContact(name, color) {
+    txData.contact = name; txData.color = color;
+    document.querySelectorAll('.contact-btn').forEach(function(b){ b.classList.remove('sel'); });
+    event.currentTarget.classList.add('sel');
+    track('Transfer Contact Selected', { contact_name: name });
+    setTimeout(function(){ txGo(2); }, 280);
+  }
+
+  function txGo(step) {
+    for (var i = 1; i <= 4; i++) {
+      var el = document.getElementById('tx'+i);
+      if (el) el.style.display = 'none';
+    }
+    document.getElementById('tx'+step).style.display = 'block';
+
+    if (step === 2) {
+      document.getElementById('tx-nm').textContent = txData.contact;
+      var av = document.getElementById('tx-av');
+      av.textContent = txData.contact.charAt(0);
+      av.style.background = txData.color;
+      amtStr = ''; updAmt();
+    }
+    if (step === 3) {
+      var val = parseFloat(amtStr.replace(',','.')) || 0;
+      var fmt = val.toLocaleString('es-AR');
+      document.getElementById('conf-nm').textContent  = txData.contact;
+      document.getElementById('conf-amt').textContent = '$' + fmt;
+      txData.amount = fmt;
+      track('Transfer Amount Entered', { amount: val, currency: 'ARS', recipient: txData.contact });
+      track('Checkout Started', { amount: val, recipient: txData.contact, method: 'transfer' });
+    }
+  }
+
+  function pad(v) {
+    if (v === ',' && amtStr.includes(',')) return;
+    if (amtStr.length >= 10) return;
+    amtStr += v; updAmt();
+  }
+  function padDel() { amtStr = amtStr.slice(0,-1); updAmt(); }
+  function updAmt() { document.getElementById('amt-disp').textContent = amtStr || '0'; }
+
+  function txConfirm() {
+    var val = parseFloat(amtStr.replace(',','.')) || 0;
+    track('Transfer Confirmed', { amount: val, currency: 'ARS', recipient: txData.contact, method: 'cvu' });
+
+    document.getElementById('tx-ok-text').textContent =
+      'Enviaste $' + txData.amount + ' a ' + txData.contact + ' exitosamente.';
+    document.getElementById('ref-n').textContent = Math.floor(Math.random()*900000+100000);
+    txGo(4);
+
+    setTimeout(function(){
+      track('Transfer Completed', { amount: val, currency: 'ARS', recipient: txData.contact });
+    }, 600);
+    toast('Transferencia enviada a ' + txData.contact + ' ✅', '💸');
+  }
+</script>
+
+</body>
+</html>
